@@ -1,32 +1,28 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Preview the release without pushing tags or creating a GitHub Release.
+        type: boolean
+        default: true
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.head_branch == 'master'
-      )
+    environment: release
     steps:
       - name: Checkout
         # actions/checkout v6.0.2
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - uses: ./.github/actions/setup
 
@@ -43,6 +39,8 @@ jobs:
 
       - name: Prepare changelog
         id: changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -73,7 +71,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Preview release
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.dry-run
         env:
           TAG: ${{ steps.changelog.outputs.tag }}
           MAJOR: ${{ steps.changelog.outputs.major }}
@@ -103,7 +101,7 @@ jobs:
           cat "$NOTES_FILE"
 
       - name: Publish version
-        if: github.event_name != 'workflow_dispatch'
+        if: ${{ !inputs.dry-run }}
         env:
           # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
           # limited by this workflow's top-level permissions block.

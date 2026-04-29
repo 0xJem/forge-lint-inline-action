@@ -14,7 +14,8 @@ on:
       - tests/**
 
 permissions:
-  contents: write
+  contents: read
+  pull-requests: read
 
 jobs:
   preview:
@@ -38,6 +39,8 @@ jobs:
         run: python scripts/check_release.py --mode pr --base-ref origin/master
 
       - name: Prepare changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -56,7 +59,8 @@ jobs:
           python scripts/generate_changelog.py \
             --base-ref "$changelog_base" \
             --head-ref "$current_commit" \
-            --repo "$GITHUB_REPOSITORY" > "$notes_file"
+            --repo "$GITHUB_REPOSITORY" \
+            --current-pr-number "${{ github.event.pull_request.number }}" > "$notes_file"
 
           {
             echo "## Release preview"
