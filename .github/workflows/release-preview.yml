@@ -8,7 +8,6 @@ on:
       - action.yml
       - README.md
       - mise.toml
-      - .github/release.yml
       - .github/workflows/release.yml
       - .github/workflows/release-preview.yml
       - scripts/**
@@ -38,9 +37,7 @@ jobs:
       - name: Validate release
         run: python scripts/check_release.py --mode pr --base-ref origin/master
 
-      - name: Preview changelog
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Prepare changelog
         run: |
           set -euo pipefail
 
@@ -49,20 +46,17 @@ jobs:
           major="v${version%%.*}"
           current_commit="$(git rev-parse HEAD)"
           previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
+          changelog_base="$previous_tag"
           notes_file="$RUNNER_TEMP/release-notes.md"
 
-          fields=(
-            -f "tag_name=${tag}"
-            -f "target_commitish=${current_commit}"
-            -f "configuration_file_path=.github/release.yml"
-          )
-          if [ -n "$previous_tag" ]; then
-            fields+=(-f "previous_tag_name=${previous_tag}")
+          if [ -z "$changelog_base" ]; then
+            changelog_base="origin/master"
           fi
 
-          gh api -X POST "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-            "${fields[@]}" \
-            --jq ".body" > "$notes_file"
+          python scripts/generate_changelog.py \
+            --base-ref "$changelog_base" \
+            --head-ref "$current_commit" \
+            --repo "$GITHUB_REPOSITORY" > "$notes_file"
 
           {
             echo "## Release preview"
@@ -70,11 +64,7 @@ jobs:
             echo "- Version tag: \`${tag}\`"
             echo "- Moving major tag: \`${major}\`"
             echo "- Target commit: \`${current_commit}\`"
-            if [ -n "$previous_tag" ]; then
-              echo "- Changelog starts at: \`${previous_tag}\`"
-            else
-              echo "- Changelog starts at: first release"
-            fi
+            echo "- Changelog starts at: \`${changelog_base}\`"
             echo
             echo "## Changelog preview"
             echo

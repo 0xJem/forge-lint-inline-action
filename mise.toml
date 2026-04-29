@@ -33,11 +33,11 @@ run = [
 
 [tasks.build]
 description = "Run build-time validation."
-run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_validate_inputs.py"
+run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/generate_changelog.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_generate_changelog.py tests/test_validate_inputs.py"
 
 [tasks.build-check]
 description = "Run build-time validation without modifying files."
-run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_validate_inputs.py"
+run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/generate_changelog.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_generate_changelog.py tests/test_validate_inputs.py"
 
 [tasks.test]
 description = "Run tests."
