@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint
+            task: lint-check
+          - name: Format
+            task: format-check
+          - name: Build
+            task: build-check
+          - name: Test
+            task: test-check
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - uses: ./.github/actions/setup
+
+      - name: Run ${{ matrix.name }}
+        run: mise run ${{ matrix.task }}

@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Preview the release without pushing tags or creating a GitHub Release.
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Fetch tags
+        run: git fetch --force --tags origin
+
+      - name: Validate release
+        run: mise run release-check
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare changelog
+        id: changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(cat VERSION)"
+          tag="v${version}"
+          major="v${version%%.*}"
+          current_commit="$(git rev-parse HEAD)"
+          previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
+          notes_file="$RUNNER_TEMP/release-notes.md"
+
+          changelog_args=(
+            --head-ref "$current_commit"
+            --repo "$GITHUB_REPOSITORY"
+          )
+          if [ -n "$previous_tag" ]; then
+            changelog_args+=(--base-ref "$previous_tag")
+          fi
+
+          python scripts/generate_changelog.py "${changelog_args[@]}" > "$notes_file"
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "major=${major}"
+            echo "current_commit=${current_commit}"
+            echo "previous_tag=${previous_tag}"
+            echo "notes_file=${notes_file}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Preview release
+        if: inputs.dry-run
+        env:
+          TAG: ${{ steps.changelog.outputs.tag }}
+          MAJOR: ${{ steps.changelog.outputs.major }}
+          CURRENT_COMMIT: ${{ steps.changelog.outputs.current_commit }}
+          PREVIOUS_TAG: ${{ steps.changelog.outputs.previous_tag }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Release dry run"
+            echo
+            echo "- Version tag: \`${TAG}\`"
+            echo "- Moving major tag: \`${MAJOR}\`"
+            echo "- Target commit: \`${CURRENT_COMMIT}\`"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "- Changelog starts at: \`${PREVIOUS_TAG}\`"
+            else
+              echo "- Changelog starts at: first release"
+            fi
+            echo
+            echo "## Changelog preview"
+            echo
+            cat "$NOTES_FILE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat "$NOTES_FILE"
+
+      - name: Publish version
+        if: ${{ !inputs.dry-run }}
+        env:
+          # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
+          # limited by this workflow's top-level permissions block.
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.changelog.outputs.tag }}
+          MAJOR: ${{ steps.changelog.outputs.major }}
+          CURRENT_COMMIT: ${{ steps.changelog.outputs.current_commit }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          set -euo pipefail
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "${TAG}")"
+            if [ "$tagged_commit" != "$CURRENT_COMMIT" ]; then
+              echo "::error::${TAG} already exists on ${tagged_commit}, not ${CURRENT_COMMIT}"
+              exit 1
+            fi
+          else
+            git tag -a "$TAG" -m "$TAG"
+            git push origin "$TAG"
+          fi
+
+          git tag -f "$MAJOR" "$TAG"
+          git push -f origin "$MAJOR"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file "$NOTES_FILE" \
+              --verify-tag
+          fi

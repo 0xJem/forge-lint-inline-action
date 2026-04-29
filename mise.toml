@@ -1,0 +1,64 @@
+min_version = "2026.4.25"
+
+[tools]
+python = "3.14.4"
+ruff = "0.15.12"
+taplo = "0.10.0"
+actionlint = "1.7.12"
+dprint = "0.54.0"
+
+[tasks.lint]
+description = "Run lint checks and apply supported fixes."
+run = ["ruff check --fix .", "actionlint"]
+
+[tasks.lint-check]
+description = "Run lint checks without modifying files."
+run = ["ruff check .", "actionlint"]
+
+[tasks.format]
+description = "Format project files."
+run = [
+  "ruff format .",
+  "taplo fmt mise.toml",
+  "DPRINT_CACHE_DIR=\"$PWD/.dprint-cache\" dprint fmt",
+]
+
+[tasks.format-check]
+description = "Check project formatting without modifying files."
+run = [
+  "ruff format --check .",
+  "taplo fmt --check mise.toml",
+  "DPRINT_CACHE_DIR=\"$PWD/.dprint-cache\" dprint check",
+]
+
+[tasks.build]
+description = "Run build-time validation."
+run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/generate_changelog.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_generate_changelog.py tests/test_validate_inputs.py"
+
+[tasks.build-check]
+description = "Run build-time validation without modifying files."
+run = "python -m py_compile scripts/annotate_forge_lint.py scripts/check_release.py scripts/generate_changelog.py scripts/validate_inputs.py tests/test_annotate_forge_lint.py tests/test_generate_changelog.py tests/test_validate_inputs.py"
+
+[tasks.test]
+description = "Run tests."
+run = "python -m unittest discover -s tests"
+
+[tasks.test-check]
+description = "Run tests in CI/check mode."
+run = "python -m unittest discover -s tests"
+
+[tasks.release-check]
+description = "Validate release state for the current VERSION."
+run = "python scripts/check_release.py --mode release --allow-current-tag"
+
+[tasks.hooks-install]
+description = "Install repository Git hooks."
+run = "git config core.hooksPath scripts/hooks"
+
+[tasks.validate]
+description = "Run all local validation tasks, applying supported fixes."
+depends = ["lint", "format", "build", "test"]
+
+[tasks.validate-check]
+description = "Run all CI validation tasks without modifying files."
+depends = ["lint-check", "format-check", "build-check", "test-check"]

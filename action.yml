@@ -1,0 +1,71 @@
+name: Forge Lint Inline
+description: Run forge lint and emit GitHub Actions annotations.
+
+inputs:
+  foundry-version:
+    description: Foundry version passed to foundry-rs/foundry-toolchain.
+    default: stable
+  install-foundry:
+    description: Whether to install Foundry before linting.
+    default: "true"
+  foundry-cache:
+    description: Passed to foundry-rs/foundry-toolchain cache input.
+    default: "true"
+  working-directory:
+    description: Directory where forge lint runs.
+    default: "."
+  args:
+    description: Extra arguments appended to forge lint.
+    default: ""
+  fail-level:
+    description: none | error | warning | notice
+    default: warning
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      id: validate-inputs
+      shell: bash
+      env:
+        FOUNDRY_VERSION: ${{ inputs.foundry-version }}
+        INSTALL_FOUNDRY: ${{ inputs.install-foundry }}
+        FOUNDRY_CACHE: ${{ inputs.foundry-cache }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        FAIL_LEVEL: ${{ inputs.fail-level }}
+      run: |
+        python3 "$GITHUB_ACTION_PATH/scripts/validate_inputs.py" \
+          --foundry-version "$FOUNDRY_VERSION" \
+          --install-foundry "$INSTALL_FOUNDRY" \
+          --foundry-cache "$FOUNDRY_CACHE" \
+          --working-directory "$WORKING_DIRECTORY" \
+          --fail-level "$FAIL_LEVEL"
+
+    - name: Install Foundry
+      if: steps.validate-inputs.outputs.install_foundry == 'true'
+      # foundry-rs/foundry-toolchain v1.8.0
+      uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d
+      with:
+        version: ${{ steps.validate-inputs.outputs.foundry_version }}
+        cache: ${{ steps.validate-inputs.outputs.foundry_cache }}
+
+    - name: Run forge lint
+      shell: bash
+      working-directory: ${{ steps.validate-inputs.outputs.working_directory }}
+      env:
+        FORGE_LINT_ARGS: ${{ inputs.args }}
+        FAIL_LEVEL: ${{ steps.validate-inputs.outputs.fail_level }}
+      run: |
+        set +e
+
+        output_file="$RUNNER_TEMP/forge-lint-output.jsonl"
+
+        # Intentional word splitting lets callers pass forge lint flags through inputs.args.
+        # shellcheck disable=SC2086
+        forge lint --json --deny never $FORGE_LINT_ARGS > "$output_file" 2>&1
+        forge_status=$?
+
+        python3 "$GITHUB_ACTION_PATH/scripts/annotate_forge_lint.py" \
+          --input "$output_file" \
+          --forge-status "$forge_status" \
+          --fail-level "$FAIL_LEVEL"
