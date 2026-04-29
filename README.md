@@ -141,6 +141,8 @@ The release workflow runs after the CI workflow completes successfully for a pus
 
 The published action also pins its Foundry setup dependency by commit SHA. The current SHA is the `v1.8.0` ref for `foundry-rs/foundry-toolchain`.
 
+Workflow jobs keep `actions/checkout` as the first explicit step. Local composite actions, such as `./.github/actions/setup`, are loaded from the checked-out workspace and cannot be used before checkout has run.
+
 ## GitHub Actions Pinning
 
 This repository pins third-party GitHub Actions by commit SHA and documents the human version next to the pin in YAML comments. That gives reproducible workflow behavior while keeping upgrades reviewable.

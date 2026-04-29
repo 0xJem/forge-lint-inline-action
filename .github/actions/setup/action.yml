@@ -1,24 +1,9 @@
-name: Setup Repository
-description: Checkout the repository and install pinned mise tools.
-
-inputs:
-  fetch-depth:
-    description: History depth passed to actions/checkout.
-    default: "1"
-  ref:
-    description: Git ref or SHA passed to actions/checkout.
-    default: ""
+name: Setup Repository Tools
+description: Install pinned mise tools.
 
 runs:
   using: composite
   steps:
-    - name: Checkout
-      # actions/checkout v6.0.2
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      with:
-        fetch-depth: ${{ inputs.fetch-depth }}
-        ref: ${{ inputs.ref }}
-
     - name: Install mise tools
       # jdx/mise-action v4.0.1
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151
