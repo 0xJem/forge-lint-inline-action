@@ -22,6 +22,7 @@ class ValidateInputsTests(unittest.TestCase):
         github_output=None,
     ):
         env = os.environ.copy()
+        env.pop("GITHUB_OUTPUT", None)
         if github_output:
             env["GITHUB_OUTPUT"] = str(github_output)
 
