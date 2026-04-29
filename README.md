@@ -158,9 +158,7 @@ Allowed types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refact
 
 The release workflow runs on demand with `workflow_dispatch`. It validates the release state, publishes the immutable version tag, updates the moving major tag, and creates the GitHub Release with generated release notes. The release notes are generated from pull request titles since the previous semver release tag and include links to the included PRs. The release workflow uses GitHub's automatic per-run `GITHUB_TOKEN`, scoped by the workflow `permissions` block to `contents: write`.
 
-The release workflow defaults to a dry run. Dry runs validate the release state, compute the tags, build the generated changelog, and write a changelog preview to the workflow summary without pushing tags or creating a release. To publish, run the workflow with `dry-run` disabled; the `release` environment can require maintainer approval before the job proceeds.
-
-Pull requests into `master` also run a release preview when release-relevant files change. The preview validates the proposed `VERSION`, computes the tag names, builds the generated changelog from the current PR title, and writes the changelog preview to the workflow summary before merge.
+The release workflow defaults to a dry run. Dry runs validate the release state, compute the tags, build the generated changelog, and write a changelog preview to the workflow summary without pushing tags or creating a release. To preview a branch before merge, manually run the release workflow from that branch with `dry-run` enabled. To publish, run the workflow from `master` with `dry-run` disabled; the `release` environment can require maintainer approval before the job proceeds.
 
 The published action also pins its Foundry setup dependency by commit SHA. The current SHA is the `v1.8.0` ref for `foundry-rs/foundry-toolchain`.
 

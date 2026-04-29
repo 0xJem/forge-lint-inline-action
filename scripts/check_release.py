@@ -19,7 +19,6 @@ RELEASE_RELEVANT_PATHS = {
     "README.md",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
-    ".github/workflows/release-preview.yml",
 }
 RELEASE_RELEVANT_PREFIXES = ("scripts/", "tests/")
 
