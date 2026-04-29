@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,16 +14,19 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'master'
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'master'
+      )
     steps:
       - name: Checkout
         # actions/checkout v6.0.2
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - uses: ./.github/actions/setup
 
@@ -37,10 +41,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Publish version
+      - name: Prepare changelog
+        id: changelog
         env:
-          # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
-          # limited by this workflow's top-level permissions block.
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -49,28 +52,93 @@ jobs:
           tag="v${version}"
           major="v${version%%.*}"
           current_commit="$(git rev-parse HEAD)"
+          previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
+          notes_file="$RUNNER_TEMP/release-notes.md"
 
-          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            tagged_commit="$(git rev-list -n 1 "${tag}")"
-            if [ "$tagged_commit" != "$current_commit" ]; then
-              echo "::error::${tag} already exists on ${tagged_commit}, not ${current_commit}"
+          fields=(
+            -f "tag_name=${tag}"
+            -f "target_commitish=${current_commit}"
+            -f "configuration_file_path=.github/release.yml"
+          )
+          if [ -n "$previous_tag" ]; then
+            fields+=(-f "previous_tag_name=${previous_tag}")
+          fi
+
+          gh api -X POST "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            "${fields[@]}" \
+            --jq ".body" > "$notes_file"
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "major=${major}"
+            echo "current_commit=${current_commit}"
+            echo "previous_tag=${previous_tag}"
+            echo "notes_file=${notes_file}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Preview release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.changelog.outputs.tag }}
+          MAJOR: ${{ steps.changelog.outputs.major }}
+          CURRENT_COMMIT: ${{ steps.changelog.outputs.current_commit }}
+          PREVIOUS_TAG: ${{ steps.changelog.outputs.previous_tag }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Release dry run"
+            echo
+            echo "- Version tag: \`${TAG}\`"
+            echo "- Moving major tag: \`${MAJOR}\`"
+            echo "- Target commit: \`${CURRENT_COMMIT}\`"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "- Changelog starts at: \`${PREVIOUS_TAG}\`"
+            else
+              echo "- Changelog starts at: first release"
+            fi
+            echo
+            echo "## Changelog preview"
+            echo
+            cat "$NOTES_FILE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat "$NOTES_FILE"
+
+      - name: Publish version
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
+          # limited by this workflow's top-level permissions block.
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.changelog.outputs.tag }}
+          MAJOR: ${{ steps.changelog.outputs.major }}
+          CURRENT_COMMIT: ${{ steps.changelog.outputs.current_commit }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          set -euo pipefail
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "${TAG}")"
+            if [ "$tagged_commit" != "$CURRENT_COMMIT" ]; then
+              echo "::error::${TAG} already exists on ${tagged_commit}, not ${CURRENT_COMMIT}"
               exit 1
             fi
           else
-            git tag -a "$tag" -m "$tag"
-            git push origin "$tag"
+            git tag -a "$TAG" -m "$TAG"
+            git push origin "$TAG"
           fi
 
-          git tag -f "$major" "$tag"
-          git push -f origin "$major"
+          git tag -f "$MAJOR" "$TAG"
+          git push -f origin "$MAJOR"
 
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release ${tag} already exists"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists"
           else
-            release_args=("$tag" --title "$tag" --generate-notes --verify-tag)
-            previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
-            if [ -n "$previous_tag" ]; then
-              release_args+=(--notes-start-tag "$previous_tag")
-            fi
-            gh release create "${release_args[@]}"
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file "$NOTES_FILE" \
+              --verify-tag
           fi

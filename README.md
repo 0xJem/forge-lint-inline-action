@@ -158,6 +158,8 @@ Allowed types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refact
 
 The release workflow runs after the CI workflow completes successfully for a push to `master`. It checks out the exact commit CI tested, validates the release state, publishes the immutable version tag, updates the moving major tag, and creates the GitHub Release with generated release notes. The generated notes use `.github/release.yml` for changelog categories and start from the previous semver release tag when one exists. The release workflow uses GitHub's automatic per-run `GITHUB_TOKEN`, scoped by the workflow `permissions` block to `contents: write`.
 
+The release workflow can also be run manually as a dry run. Manual runs validate the release state, compute the tags, build the generated changelog, and write a changelog preview to the workflow summary without pushing tags or creating a release.
+
 The published action also pins its Foundry setup dependency by commit SHA. The current SHA is the `v1.8.0` ref for `foundry-rs/foundry-toolchain`.
 
 Workflow jobs keep `actions/checkout` as the first explicit step. Local composite actions, such as `./.github/actions/setup`, are loaded from the checked-out workspace and cannot be used before checkout has run.
