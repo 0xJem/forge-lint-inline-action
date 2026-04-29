@@ -67,5 +67,10 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release ${tag} already exists"
           else
-            gh release create "$tag" --title "$tag" --generate-notes
+            release_args=("$tag" --title "$tag" --generate-notes --verify-tag)
+            previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
+            if [ -n "$previous_tag" ]; then
+              release_args+=(--notes-start-tag "$previous_tag")
+            fi
+            gh release create "${release_args[@]}"
           fi
