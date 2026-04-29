@@ -32,6 +32,11 @@ jobs:
       - name: Validate release
         run: mise run release-check
 
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Publish version
         env:
           # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
