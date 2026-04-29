@@ -19,8 +19,8 @@ permissions:
   contents: read
 
 steps:
-  # actions/checkout v5
-  - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+  # actions/checkout v6.0.2
+  - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
   # 0xJem/forge-lint-inline-action v0.1.0 or a reviewed commit
   - uses: 0xJem/forge-lint-inline-action@<commit-sha>

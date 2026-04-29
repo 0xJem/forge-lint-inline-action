@@ -13,15 +13,15 @@ runs:
   using: composite
   steps:
     - name: Checkout
-      # actions/checkout v5
-      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      # actions/checkout v6.0.2
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
         ref: ${{ inputs.ref }}
 
     - name: Install mise tools
-      # jdx/mise-action v3.4.1
-      uses: jdx/mise-action@9dc7d5dd454262207dea3ab5a06a3df6afc8ff26
+      # jdx/mise-action v4.0.1
+      uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151
       with:
         version: 2026.4.25
         install: true
