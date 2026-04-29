@@ -139,6 +139,23 @@ mise run test-check
 mise run validate-check
 ```
 
+Install the repository Git hooks:
+
+```bash
+mise run hooks-install
+```
+
+The `commit-msg` hook validates commit subjects before Git accepts them. Commit subjects must use Conventional Commit style:
+
+```text
+feat: add severity filtering
+fix(parser): handle nested diagnostics
+docs: clarify inline workflow annotations
+ci!: change release approval flow
+```
+
+Allowed types are `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, and `test`.
+
 The release workflow runs after the CI workflow completes successfully for a push to `master`. It checks out the exact commit CI tested, validates the release state, publishes the immutable version tag, updates the moving major tag, and creates the GitHub Release. The release workflow uses GitHub's automatic per-run `GITHUB_TOKEN`, scoped by the workflow `permissions` block to `contents: write`.
 
 The published action also pins its Foundry setup dependency by commit SHA. The current SHA is the `v1.8.0` ref for `foundry-rs/foundry-toolchain`.
