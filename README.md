@@ -12,6 +12,8 @@ Inline workflow annotations are the `::error`, `::warning`, and `::notice` messa
 
 GitHub Actions annotations cannot render review-comment suggestion blocks. If Forge exposes suggested replacements, this action includes them as plain text in the annotation body.
 
+For a live example of how the annotations appear on changed Solidity files, see the [forge lint inline smoke test PR](https://github.com/0xJem/forge-lint-inline-smoke/pull/2/changes).
+
 ## Usage
 
 ```yaml
