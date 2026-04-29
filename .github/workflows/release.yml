@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master'
+    steps:
+      - uses: ./.github/actions/setup
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Fetch tags
+        run: git fetch --force --tags origin
+
+      - name: Validate release
+        run: mise run release-check
+
+      - name: Publish version
+        env:
+          # github.token is the automatic per-run GITHUB_TOKEN. Its write scope is
+          # limited by this workflow's top-level permissions block.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(cat VERSION)"
+          tag="v${version}"
+          major="v${version%%.*}"
+          current_commit="$(git rev-parse HEAD)"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "${tag}")"
+            if [ "$tagged_commit" != "$current_commit" ]; then
+              echo "::error::${tag} already exists on ${tagged_commit}, not ${current_commit}"
+              exit 1
+            fi
+          else
+            git tag -a "$tag" -m "$tag"
+            git push origin "$tag"
+          fi
+
+          git tag -f "$major" "$tag"
+          git push -f origin "$major"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists"
+          else
+            gh release create "$tag" --title "$tag" --generate-notes
+          fi
