@@ -1,0 +1,84 @@
+name: Release Preview
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - VERSION
+      - action.yml
+      - README.md
+      - mise.toml
+      - .github/release.yml
+      - .github/workflows/release.yml
+      - .github/workflows/release-preview.yml
+      - scripts/**
+      - tests/**
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    name: Release Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Fetch master and tags
+        run: |
+          git fetch --force --tags origin
+          git fetch --force origin master:refs/remotes/origin/master
+
+      - name: Validate release
+        run: python scripts/check_release.py --mode pr --base-ref origin/master
+
+      - name: Preview changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(cat VERSION)"
+          tag="v${version}"
+          major="v${version%%.*}"
+          current_commit="$(git rev-parse HEAD)"
+          previous_tag="$(git tag -l 'v*.*.*' --sort=-v:refname | awk -v current="$tag" '$0 != current { print; exit }')"
+          notes_file="$RUNNER_TEMP/release-notes.md"
+
+          fields=(
+            -f "tag_name=${tag}"
+            -f "target_commitish=${current_commit}"
+            -f "configuration_file_path=.github/release.yml"
+          )
+          if [ -n "$previous_tag" ]; then
+            fields+=(-f "previous_tag_name=${previous_tag}")
+          fi
+
+          gh api -X POST "/repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            "${fields[@]}" \
+            --jq ".body" > "$notes_file"
+
+          {
+            echo "## Release preview"
+            echo
+            echo "- Version tag: \`${tag}\`"
+            echo "- Moving major tag: \`${major}\`"
+            echo "- Target commit: \`${current_commit}\`"
+            if [ -n "$previous_tag" ]; then
+              echo "- Changelog starts at: \`${previous_tag}\`"
+            else
+              echo "- Changelog starts at: first release"
+            fi
+            echo
+            echo "## Changelog preview"
+            echo
+            cat "$notes_file"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat "$notes_file"

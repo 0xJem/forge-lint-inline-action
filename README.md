@@ -160,6 +160,8 @@ The release workflow runs after the CI workflow completes successfully for a pus
 
 The release workflow can also be run manually as a dry run. Manual runs validate the release state, compute the tags, build the generated changelog, and write a changelog preview to the workflow summary without pushing tags or creating a release.
 
+Pull requests into `master` also run a release preview when release-relevant files change. The preview validates the proposed `VERSION`, computes the tag names, builds the generated changelog from the branch, and writes the changelog preview to the workflow summary before merge.
+
 The published action also pins its Foundry setup dependency by commit SHA. The current SHA is the `v1.8.0` ref for `foundry-rs/foundry-toolchain`.
 
 Workflow jobs keep `actions/checkout` as the first explicit step. Local composite actions, such as `./.github/actions/setup`, are loaded from the checked-out workspace and cannot be used before checkout has run.
